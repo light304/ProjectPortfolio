@@ -1,44 +1,43 @@
 <!DOCTYPE html>
-
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio</title>
-    <link rel="stylesheet" href="styling.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic Pointy-Top Hex Grid</title>
+<link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <div class="Head">
-        <header>
-            <h1>Cooper Gardyne</h1>
-        </header>
-        <div class="nav">
-            <button class="homeButton" href="#">Home</button>
-            <button class="aboutButton" href="#">About</button>
-            <button class="contactButton" href="#">Contact</button>
-        </div>
-    </div>
 
-    <div class="main1">
-        <p>This is a simple HTML page created as an example.</p>
-        <p>HTML stands for HyperText Markup Language and is used to create web pages.</p>            
-    </div>
-    
-    <div class="main2">
-        <p>This is a simple HTML page created as an example.</p>
-        <p>HTML stands for HyperText Markup Language and is used to create web pages.</p>            
-    </div>
+  <canvas id="hexCanvas"></canvas>
 
-    <div class="main3">
-        <p>This is a simple HTML page created as an example.</p>
-        <p>HTML stands for HyperText Markup Language and is used to create web pages.</p>            
-    </div>
+  <main>
+    <section class="panel" id="hero">
+      <h1>Dynamic Hex Grid</h1>
+      <p>Resize the window and watch the hexagon tessellation recalculate itself to stay within 60–100px wide, closest to 80px.</p>
+      <p class="stats" id="stats">calculating...</p>
+    </section>
 
-    <div class="main4">
-    </div>
-        
-    <footer>
-        <p>&copy; 2024 My First HTML Page</p>
-    </footer>
+    <section class="panel alt">
+      <h2>Section Two</h2>
+      <p>This is just filler content to demonstrate long-scroll behaviour. The hex grid is drawn on a fixed full-viewport canvas layer sitting behind everything, and regenerates on scroll/resize so it always covers the full document height.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Section Three</h2>
+      <p>Pointy-top hexagons were chosen deliberately — their vertical elongation reinforces the downward scroll direction of a single long-form page rather than a horizontal, multi-panel feel.</p>
+    </section>
+
+    <section class="panel alt">
+      <h2>Section Four</h2>
+      <p>Keep scrolling — the canvas height matches the full page height, not just the viewport, so the tessellation runs the entire length of the site.</p>
+    </section>
+
+    <section class="panel">
+      <h2>End</h2>
+      <p>That's the baseline. From here, section edges/dividers can be snapped to hex vertices instead of being purely decorative overlay.</p>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
 </body>
-
+</html>
