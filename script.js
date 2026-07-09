@@ -49,7 +49,8 @@ function drawHex(ctx, cx, cy, size) {
   ctx.stroke();
 }
 
-// Fills a hex path instead of stroking it (used for the gradient column)
+// Fills a hex path with no stroke — used for every hex that's "in use"
+// (gradient column + highlight edges). No border, just color.
 function fillHex(ctx, cx, cy, size, fillStyle) {
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
@@ -60,7 +61,6 @@ function fillHex(ctx, cx, cy, size, fillStyle) {
   ctx.closePath();
   ctx.fillStyle = fillStyle;
   ctx.fill();
-  ctx.stroke(); // keep the outline consistent with the rest of the grid
 }
 
 // ---------------------------------------------
@@ -143,8 +143,6 @@ function renderGrid() {
   canvas.style.height = docHeight + 'px';
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = 'rgba(234, 231, 221, 0.12)';
-  ctx.lineWidth = 1;
 
   const rows = Math.ceil(docHeight / vertStep) + 2;
 
@@ -152,8 +150,11 @@ function renderGrid() {
   // Columns run 0 .. grid.count-1 across the exact viewport width,
   // so grid.count - 1 is one hex in from the edge.
   const targetCol = grid.count - 1;
+  
 
-  // Gradient endpoints — swap these for whatever palette you want.
+  // Shared gradient scale — used by BOTH the right-hand column
+  // and any highlighted container edges, so color always reflects
+  // the same position down the page regardless of which one it's on.
   const colorTop = '#1b4332';    // deep forest green
   const colorBottom = '#ffb703'; // amber
 
@@ -168,6 +169,8 @@ function renderGrid() {
     const y = r * vertStep;
     const offsetX = (r % 2 !== 0) ? hexWidth / 2 : 0;
     const cols = grid.count + 1;
+    const t = Math.min(Math.max(y / docHeight, 0), 1);
+    const scaleColor = lerpColor(colorTop, colorBottom, t);
 
     for (let c = -1; c <= cols; c++) {
       const x = c * hexWidth + offsetX;
@@ -178,16 +181,14 @@ function renderGrid() {
 
       if (isEdgeHex) {
         ctx.save();
-        ctx.shadowColor = 'rgba(255, 183, 3, 0.9)';
-        ctx.shadowBlur = 12;
-        fillHex(ctx, x, y, size, 'rgba(255, 183, 3, 0.85)');
+        ctx.shadowColor = scaleColor;
+        ctx.shadowBlur = 14;
+        fillHex(ctx, x, y, size, scaleColor);
         ctx.restore();
       } else if (c === targetCol) {
-        const t = Math.min(Math.max(y / docHeight, 0), 1);
-        fillHex(ctx, x, y, size, lerpColor(colorTop, colorBottom, t));
-      } else {
-        drawHex(ctx, x, y, size);
+        fillHex(ctx, x, y, size, scaleColor);
       }
+      // else: hex is unused — skip drawing entirely, stays invisible
     }
   }
 
