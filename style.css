@@ -33,11 +33,10 @@ main {
   align-items: flex-start;
   padding: 8vh 10vw;
   border-bottom: 1px solid rgba(234, 231, 221, 0.08);
-  border: none;
 }
 
 .panel.alt {
-  background: rgba(204, 0, 0, 0.03);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .panel h1 {
@@ -85,5 +84,23 @@ main {
 }
 
 .hex-highlight-box p {
+  margin: 0 auto;
+}
+
+.hex-fill-box {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 3rem 3rem;
+  text-align: center;
+  background: rgba(14, 15, 18, 0.35);
+  backdrop-filter: blur(2px);
+  border-radius: 2px;
+}
+
+.hex-fill-box h2 {
+  margin-bottom: 1rem;
+}
+
+.hex-fill-box p {
   margin: 0 auto;
 }

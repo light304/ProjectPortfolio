@@ -120,6 +120,12 @@ function isHexOnRectEdge(cx, cy, threshold, rect) {
   return distanceToRectEdge(cx, cy, rect) <= threshold;
 }
 
+// True if a point sits fully inside a rect (used for data-hex-fill,
+// where we want the whole interior colored in, not just the edge band).
+function isPointInRect(px, py, rect) {
+  return px >= rect.left && px <= rect.right && py >= rect.top && py <= rect.bottom;
+}
+
 // ---------------------------------------------
 // 3. Build + render the full-page tessellation
 // ---------------------------------------------
@@ -150,7 +156,6 @@ function renderGrid() {
   // Columns run 0 .. grid.count-1 across the exact viewport width,
   // so grid.count - 1 is one hex in from the edge.
   const targetCol = grid.count - 1;
-  
 
   // Shared gradient scale — used by BOTH the right-hand column
   // and any highlighted container edges, so color always reflects
@@ -158,10 +163,14 @@ function renderGrid() {
   const colorTop = '#1b4332';    // deep forest green
   const colorBottom = '#ffb703'; // amber
 
-  // Any element tagged data-hex-highlight gets its edges
-  // traced by the hex grid.
+  // Two flavors of tagged element:
+  // - data-hex-highlight: only the edge band lights up (pure outline)
+  // - data-hex-fill:      edge band AND the full interior light up
   const highlightRects = Array.from(
     document.querySelectorAll('[data-hex-highlight]')
+  ).map(getDocRect);
+  const fillRects = Array.from(
+    document.querySelectorAll('[data-hex-fill]')
   ).map(getDocRect);
   const edgeThreshold = size * 0.85; // how "thick" the outline band reads
 
@@ -175,11 +184,19 @@ function renderGrid() {
     for (let c = -1; c <= cols; c++) {
       const x = c * hexWidth + offsetX;
 
-      const isEdgeHex = highlightRects.some(rect =>
+      const isHighlightEdge = highlightRects.some(rect =>
         isHexOnRectEdge(x, y, edgeThreshold, rect)
       );
+      const isFillEdge = fillRects.some(rect =>
+        isHexOnRectEdge(x, y, edgeThreshold, rect)
+      );
+      const isFillInterior = fillRects.some(rect =>
+        isPointInRect(x, y, rect)
+      );
 
-      if (isEdgeHex) {
+      const isActive = isHighlightEdge || isFillEdge || isFillInterior;
+
+      if (isActive) {
         ctx.save();
         ctx.shadowColor = scaleColor;
         ctx.shadowBlur = 14;
