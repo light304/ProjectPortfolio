@@ -4,7 +4,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   background: #faeeda;
   color: #eae7dd;
@@ -43,6 +44,10 @@ main {
   padding: 8vh 10vw;
 }
 
+.panel.intro {
+  min-height: 65vh;
+}
+
 .panel h1 {
   font-size: clamp(2.2rem, 5vw, 4rem);
   margin-bottom: 1rem;
@@ -58,7 +63,7 @@ main {
   max-width: 60ch;
   line-height: 1.6;
   font-size: 1.05rem;
-  color: #cfcabb;
+  color: #faeeda;
 }
 
 .stats {
