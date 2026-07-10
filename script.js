@@ -82,6 +82,13 @@ function lerpColor(hexA, hexB, t) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+// Inverts an "rgb(r, g, b)" string — used when hovering a hex
+// that's already part of the gradient/highlight/fill system.
+function invertColor(rgbStr) {
+  const [r, g, b] = rgbStr.match(/\d+/g).map(Number);
+  return `rgb(${255 - r}, ${255 - g}, ${255 - b})`;
+}
+
 // ---------------------------------------------
 // Edge detection: find hexagons sitting on the
 // boundary of any element tagged [data-hex-highlight].
@@ -131,7 +138,18 @@ function isPointInRect(px, py, rect) {
 // ---------------------------------------------
 const canvas = document.getElementById('hexCanvas');
 const ctx = canvas.getContext('2d');
+const hoverCanvas = document.getElementById('hexHoverCanvas');
+const hoverCtx = hoverCanvas.getContext('2d');
 const statsEl = document.getElementById('stats');
+
+// Mouse position in DOCUMENT coordinates (not viewport),
+// so it lines up with the same coordinate space the grid is drawn in.
+const mouse = { x: null, y: null };
+
+// Cached geometry/state from the last full grid render. Hover reads
+// from this instead of recomputing the grid, so mouse movement never
+// triggers a full-page redraw — only a single hex gets touched.
+let gridState = null;
 
 function renderGrid() {
   const viewportWidth = window.innerWidth;
@@ -148,6 +166,10 @@ function renderGrid() {
   canvas.height = docHeight;
   canvas.style.height = docHeight + 'px';
 
+  hoverCanvas.width = viewportWidth;
+  hoverCanvas.height = docHeight;
+  hoverCanvas.style.height = docHeight + 'px';
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const rows = Math.ceil(docHeight / vertStep) + 2;
@@ -161,7 +183,7 @@ function renderGrid() {
   // and any highlighted container edges, so color always reflects
   // the same position down the page regardless of which one it's on.
   const colorTop = '#1b4332';    // deep forest green
-  const colorBottom = '#ffb703'; // amber
+  const colorBottom = '#EF9F27'; // amber
 
   // Two flavors of tagged element:
   // - data-hex-highlight: only the edge band lights up (pure outline)
@@ -209,9 +231,83 @@ function renderGrid() {
     }
   }
 
+  // Cache everything hover needs so it never has to touch the
+  // full grid loop or requery the DOM on mouse movement.
+  gridState = {
+    docHeight, size, hexWidth, vertStep, targetCol,
+    colorTop, colorBottom, highlightRects, fillRects, edgeThreshold
+  };
+
+  // The base grid changed (resize/load) — refresh the hover hex too,
+  // since its position/size are now stale otherwise.
+  renderHover();
+
   statsEl.textContent =
     `viewport: ${viewportWidth}px  |  hexagons across: ${grid.count}  |  ` +
     `hex width: ${grid.hexWidth.toFixed(2)}px  |  hex size (circumradius): ${size.toFixed(2)}px`;
+}
+
+// ---------------------------------------------
+// Cheap, per-frame hover redraw. Only touches the small
+// hover canvas layered on top — never repaints the full grid.
+// ---------------------------------------------
+function renderHover() {
+  hoverCtx.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
+
+  if (!gridState || mouse.x === null || mouse.y === null) return;
+
+  const {
+    docHeight, size, hexWidth, vertStep, targetCol,
+    colorTop, colorBottom, highlightRects, fillRects, edgeThreshold
+  } = gridState;
+
+  let closest = null;
+
+  // Reverse-map the cursor to an approximate (row, col), then
+  // check a small neighborhood (3x3) since pointy-top offset rows
+  // mean the true nearest center isn't always the naive guess.
+  for (let dr = -1; dr <= 1; dr++) {
+    const rGuess = Math.round(mouse.y / vertStep) + dr;
+    const rowOffsetX = (rGuess % 2 !== 0) ? hexWidth / 2 : 0;
+
+    for (let dc = -1; dc <= 1; dc++) {
+      const cGuess = Math.round((mouse.x - rowOffsetX) / hexWidth) + dc;
+      const cx = cGuess * hexWidth + rowOffsetX;
+      const cy = rGuess * vertStep;
+      const dist = Math.hypot(cx - mouse.x, cy - mouse.y);
+
+      if (!closest || dist < closest.dist) {
+        closest = { c: cGuess, cx, cy, dist };
+      }
+    }
+  }
+
+  // Only light up if the cursor is genuinely within this hex,
+  // not just nearest to it from far away.
+  if (!closest || closest.dist > size) return;
+
+  const hoverT = Math.min(Math.max(closest.cy / docHeight, 0), 1);
+  const hoverGradientColor = lerpColor(colorTop, colorBottom, hoverT);
+
+  const wasEdge = highlightRects.some(rect =>
+    isHexOnRectEdge(closest.cx, closest.cy, edgeThreshold, rect)
+  ) || fillRects.some(rect =>
+    isHexOnRectEdge(closest.cx, closest.cy, edgeThreshold, rect)
+  );
+  const wasFillInterior = fillRects.some(rect =>
+    isPointInRect(closest.cx, closest.cy, rect)
+  );
+  const wasActive = wasEdge || wasFillInterior || closest.c === targetCol;
+
+  const hoverColor = wasActive
+    ? invertColor(hoverGradientColor)  // already colored -> invert
+    : hoverGradientColor;              // background -> gradient at this point
+
+  hoverCtx.save();
+  hoverCtx.shadowColor = hoverColor;
+  hoverCtx.shadowBlur = 16;
+  fillHex(hoverCtx, closest.cx, closest.cy, size, hoverColor);
+  hoverCtx.restore();
 }
 
 // ---------------------------------------------
@@ -228,3 +324,32 @@ window.addEventListener('load', renderGrid);
 // Recalculate once more shortly after load in case fonts/images
 // shift the document height.
 setTimeout(renderGrid, 300);
+
+// ---------------------------------------------
+// 5. Hover tracking — throttled to one redraw per
+//    animation frame so fast mouse movement doesn't
+//    trigger a flood of full-grid redraws.
+// ---------------------------------------------
+let hoverRafPending = false;
+function scheduleHoverRender() {
+  if (hoverRafPending) return;
+  hoverRafPending = true;
+  requestAnimationFrame(() => {
+    hoverRafPending = false;
+    renderHover();
+  });
+}
+
+window.addEventListener('mousemove', (e) => {
+  const scrollX = window.scrollX || window.pageXOffset;
+  const scrollY = window.scrollY || window.pageYOffset;
+  mouse.x = e.clientX + scrollX;
+  mouse.y = e.clientY + scrollY;
+  scheduleHoverRender();
+});
+
+window.addEventListener('mouseleave', () => {
+  mouse.x = null;
+  mouse.y = null;
+  scheduleHoverRender();
+});
