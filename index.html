@@ -5,44 +5,67 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dynamic Pointy-Top Hex Grid</title>
 <link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/x-icon" href="images/circle.png">
 </head>
 <body>
 
   <canvas id="hexCanvas"></canvas>
+  <canvas id="hexHoverCanvas"></canvas>
 
   <main>
-    <section class="panel" id="hero">
-      <h1 data-hex-highlight>Dynamic Hex Grid</h1>
-      <p>Resize the window and watch the hexagon tessellation recalculate itself to stay within 60–100px wide, closest to 80px.</p>
-      <p class="stats" id="stats">calculating...</p>
-    </section>
-
-    <section class="panel alt">
-      <h2>Section Two</h2>
-      <p>This is just filler content to demonstrate long-scroll behaviour. The hex grid is drawn on a fixed full-viewport canvas layer sitting behind everything, and regenerates on scroll/resize so it always covers the full document height.</p>
+    <section class="panel intro" id="hero" data-hex-fill>
+      <div class="intro">
+        <h1>Project Portfolio</h1>
+        <p>This website has been created by myself, designed to showcase my skills and ablilty along with the other projects I have either created or taken part of.</p>
+        <p>I hope they take your interest :)</p>
+        <br>
+        <p>Resize the window and watch the hexagon tessellation recalculate itself to stay within 60–100px wide, closest to 80px.</p>
+        <p class="stats" id="stats">calculating...</p>
+      </div>
     </section>
 
     <section class="panel">
-      <div class="hex-highlight-box" data-hex-highlight>
+      <div class="content alt">
+        <h2>This section will be dedicated to who am I, my skills, and interests.</h2>
+        <p>Cooper Gardyne, final semseter university student. Advanced skills in network configuration and software development, with a passion to match.</p>
+        <p>More yapping here.</p>
+      </div> 
+    </section>
+
+    <section class="panel">
+      <div class="content" data-hex-fill>
         <h2>Outlined By The Grid</h2>
         <p>This box's bounding edges are read straight from the DOM in JS. Any hexagon whose center falls near this rectangle's boundary lights up — so it looks like the hexagons pop up to form the border, even though the box itself has no CSS border at all.</p>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Section Three</h2>
-      <p>Pointy-top hexagons were chosen deliberately — their vertical elongation reinforces the downward scroll direction of a single long-form page rather than a horizontal, multi-panel feel.</p>
+      <div class="content alt">
+        <h2>Outlined AND Filled</h2>
+        <p>This one uses data-hex-fill instead of data-hex-highlight — same edge detection, but the hexagons underneath the entire box also light up, not just the border band.</p>
+      </div>
     </section>
 
     <section class="panel alt">
-      <h2>Section Four</h2>
-      <p>Keep scrolling — the canvas height matches the full page height, not just the viewport, so the tessellation runs the entire length of the site.</p>
-    </section>
+      <div class="content" data-hex-fill>
+        <h2>Section Three</h2>
+        <p>Pointy-top hexagons were chosen deliberately — their vertical elongation reinforces the downward scroll direction of a single long-form page rather than a horizontal, multi-panel feel.</p>
+      </div>
+      </section>
 
     <section class="panel">
-      <h2>End</h2>
-      <p>That's the baseline. From here, section edges/dividers can be snapped to hex vertices instead of being purely decorative overlay.</p>
-    </section>
+      <div class="content alt">
+        <h2>Section Four</h2>
+        <p>Keep scrolling — the canvas height matches the full page height, not just the viewport, so the tessellation runs the entire length of the site.</p>
+      </div>
+      </section>
+
+    <section class="panel footer" data-hex-fill>
+      <div class="footer">
+        <h2>End</h2>
+        <p>That's the baseline. From here, section edges/dividers can be snapped to hex vertices instead of being purely decorative overlay.</p>
+      </div>
+      </section>
   </main>
 
   <script src="script.js"></script>
