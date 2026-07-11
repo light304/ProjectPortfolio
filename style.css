@@ -4,10 +4,9 @@
   box-sizing: border-box;
 }
 
-html,
-body {
+html, body {
   width: 100%;
-  background: #faeeda;
+  background: #fdeaca;
   color: #eae7dd;
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
@@ -48,22 +47,37 @@ main {
   min-height: 65vh;
 }
 
+.alt {
+  background-color: rgba(143, 220, 160, 0.2);
+}
+
+.panel.footer {
+  min-height: 65vh;
+}
+
 .panel h1 {
   font-size: clamp(2.2rem, 5vw, 4rem);
   margin-bottom: 1rem;
   letter-spacing: -0.02em;
+  color: #faeeda;
 }
 
 .panel h2 {
   font-size: clamp(1.6rem, 3vw, 2.4rem);
   margin-bottom: 1rem;
+  color: #444441;
 }
 
 .panel p {
   max-width: 60ch;
   line-height: 1.6;
   font-size: 1.05rem;
-  color: #faeeda;
+}
+
+.content {
+  color: #444441;
+  background-color: rgba(14, 15, 18, 0.35);
+  padding: 5% 5% 5% 5%;
 }
 
 .stats {

@@ -332,14 +332,14 @@ function renderGrid() {
   const fillRects = Array.from(
     document.querySelectorAll('[data-hex-fill]')
   ).map(getDocRect);
-  const edgeThreshold = size * 0.85; // how "thick" the outline band reads
+  const edgeThreshold = size * 1; // how "thick" the outline band reads
 
   // ---------------------------------------------
   // Generate the road: a fresh random path every time the page
   // loads. Starts at the same spot the old right-hand column did
   // (top row, one hex in from the right edge) and wanders freely.
   // ---------------------------------------------
-  const roadColMax = grid.count - 1;
+  const roadColMax = grid.count - 4;
   const roadRowMax = Math.ceil(docHeight / vertStep);
 
   // Cells that fall on/inside a data-hex-highlight box are off-limits
