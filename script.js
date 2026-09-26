@@ -438,9 +438,9 @@ function renderGrid() {
 
   const splitRow = funnelRows;
   const splitOrigins = splitCols.map(c => [c, splitRow]);
-  const depthRampDistance = window.innerHeight * 0.4;
-  const middleDarkenTarget = 0.4; // doubled from 0.2
-  const backDarkenTarget = 0.8;   // doubled from 0.4
+  const depthRampDistance = window.innerHeight * 2;
+  const middleDarkenTarget = 0.3;
+  const backDarkenTarget = 0.5;
   const planeSets = { front: frontCells, middle: middleCells, back: backCells };
   const planeAssignments = shuffleArray(
     Array.from({ length: numStrands }, (_, i) => ['front', 'middle', 'back'][i % 3])
@@ -690,12 +690,9 @@ async function initProjects() {
   if (typeof renderGrid === 'function') renderGrid();
 }
 
-// Builds one full <section> (matching the site's existing full-height
-// panel pattern) dedicated to a single repo, alternating background
-// shading the same way the static content sections do.
 function buildProjectSection(repo, index) {
   const section = document.createElement('section');
-  section.className = 'panel project-panel' + (index % 2 === 1 ? ' alt' : '');
+  section.className = 'panel project-panel';
   section.setAttribute('data-hex-fill', '');
 
   const box = document.createElement('div');
