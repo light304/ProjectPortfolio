@@ -79,6 +79,12 @@ function invertColor(rgbStr) {
   return `rgb(${255 - r}, ${255 - g}, ${255 - b})`;
 }
 
+function darkenColor(rgbStr, amount) {
+  const [r, g, b] = rgbStr.match(/\d+/g).map(Number);
+  const f = 1 - amount;
+  return `rgb(${Math.round(r * f)}, ${Math.round(g * f)}, ${Math.round(b * f)})`;
+}
+
 function getDocRect(el) {
   const r = el.getBoundingClientRect();
   const scrollX = window.scrollX || window.pageXOffset;
@@ -393,12 +399,16 @@ function renderGrid() {
   const fillRects = Array.from(
     document.querySelectorAll('[data-hex-fill]')
   ).map(getDocRect);
+
   const edgeThreshold = size * 1;
 
   const roadColMax = grid.count;
   const roadRowMax = Math.ceil(docHeight / vertStep);
   const roadForbidden = new Set();
-  const claimed = new Set();
+  const frontCells = new Set();
+  const middleCells = new Set();
+  const backCells = new Set();
+  const claimed = frontCells;
   const numStrands = 5;
   const segmentWidth = (roadColMax + 1) / numStrands;
   const splitCols = Array.from({ length: numStrands }, (_, i) => {
@@ -427,8 +437,17 @@ function renderGrid() {
 
   const splitRow = funnelRows;
   const splitOrigins = splitCols.map(c => [c, splitRow]);
+  const depthRampDistance = window.innerHeight * 2;
+  const middleDarkenTarget = 0.3; // doubled from 0.2
+  const backDarkenTarget = 0.5;   // doubled from 0.4
 
-  for (const origin of splitOrigins) {
+  const planeSets = { front: frontCells, middle: middleCells, back: backCells };
+  const planeAssignments = shuffleArray(
+    Array.from({ length: numStrands }, (_, i) => ['front', 'middle', 'back'][i % 3])
+  );
+
+  splitOrigins.forEach((origin, i) => {
+    const targetSet = planeSets[planeAssignments[i]];
     const skeleton = freeStrandWalk({
       start: origin, colMin: 0, colMax: roadColMax,
       rowMin: 0, rowMax: roadRowMax, forbidden: roadForbidden,
@@ -437,10 +456,8 @@ function renderGrid() {
     const lifeLength = Math.max(3, Math.round(skeleton.length * strandLifeFraction()));
     const trimmedSkeleton = skeleton.slice(0, lifeLength);
     const widths = taperToEnd(organicWidths(trimmedSkeleton.length, 2, 3));
-    widenVariable(trimmedSkeleton, widths, roadForbidden, claimed);
-  }
-
-  const roadCells = claimed;
+    widenVariable(trimmedSkeleton, widths, roadForbidden, targetSet);
+  });
 
   for (let r = -1; r <= rows; r++) {
     const y = r * vertStep;
@@ -448,6 +465,11 @@ function renderGrid() {
     const cols = grid.count + 1;
     const t = Math.min(Math.max(y / docHeight, 0), 1);
     const scaleColor = lerpColor(colorTop, colorBottom, t);
+    // Depth ramp: every plane starts fully bright at the very top of
+    // the page and reaches its full darken amount by 40vh down, so the
+    // planes read as one bright band up top and only visibly separate
+    // in depth as you scroll — rampT goes 0 -> 1 over that distance.
+    const rampT = Math.min(Math.max(y / depthRampDistance, 0), 1);
 
     for (let c = -1; c <= cols; c++) {
       const x = c * hexWidth + offsetX;
@@ -461,15 +483,25 @@ function renderGrid() {
       const isFillInterior = fillRects.some(rect =>
         isPointInRect(x, y, rect)
       );
-      const isRoadHex = roadCells.has(keyOf(c, r));
+      const cellKey = keyOf(c, r);
+      // Priority front > middle > back — where strands from different
+      // planes overlap, the higher (less darkened) plane wins.
+      const isFrontRoad = frontCells.has(cellKey);
+      const isMiddleRoad = !isFrontRoad && middleCells.has(cellKey);
+      const isBackRoad = !isFrontRoad && !isMiddleRoad && backCells.has(cellKey);
 
-      const isActive = isHighlightEdge || isFillEdge || isFillInterior || isRoadHex;
+      const isActive = isHighlightEdge || isFillEdge || isFillInterior || isFrontRoad || isMiddleRoad || isBackRoad;
 
       if (isActive) {
+        let hexColor = scaleColor;
+        if (!isHighlightEdge && !isFillEdge && !isFillInterior) {
+          if (isMiddleRoad) hexColor = darkenColor(scaleColor, middleDarkenTarget * rampT);
+          else if (isBackRoad) hexColor = darkenColor(scaleColor, backDarkenTarget * rampT);
+        }
+
         ctx.save();
-        ctx.shadowColor = scaleColor;
-        ctx.shadowBlur = 14;
-        fillHex(ctx, x, y, size, scaleColor);
+        ctx.shadowColor = hexColor;
+        ctx.shadowBlur = 14;        fillHex(ctx, x, y, size, hexColor);
         ctx.restore();
       }
     }
@@ -479,6 +511,7 @@ function renderGrid() {
     docHeight, size, hexWidth, vertStep,
     colorTop, colorBottom, highlightRects, fillRects, edgeThreshold, roadCells
   };
+
   renderHover();
 
   statsEl.textContent =
@@ -495,7 +528,8 @@ function renderHover() {
 
   const {
     docHeight, size, hexWidth, vertStep,
-    colorTop, colorBottom, highlightRects, fillRects, edgeThreshold, roadCells
+    colorTop, colorBottom, highlightRects, fillRects, edgeThreshold,
+    frontCells, middleCells, backCells
   } = gridState;
 
   let closest = null;
@@ -529,11 +563,14 @@ function renderHover() {
   const wasFillInterior = fillRects.some(rect =>
     isPointInRect(closest.cx, closest.cy, rect)
   );
-  const wasActive = wasEdge || wasFillInterior || roadCells.has(keyOf(closest.c, closest.r));
+  const wasActive = wasEdge || wasFillInterior ||
+    frontCells.has(keyOf(closest.c, closest.r)) ||
+    middleCells.has(keyOf(closest.c, closest.r)) ||
+    backCells.has(keyOf(closest.c, closest.r));
 
   const hoverColor = wasActive
-    ? invertColor(hoverGradientColor)
-    : hoverGradientColor; 
+    ? invertColor(hoverGradientColor)  // already colored -> invert
+    : hoverGradientColor;              // background -> gradient at this point
 
   hoverCtx.save();
   hoverCtx.shadowColor = hoverColor;
@@ -635,10 +672,6 @@ async function initProjects() {
 
   if (status) status.remove();
 
-  // Build one full-page section per project and splice them in, in
-  // order, right after the intro section — the page's total length
-  // grows or shrinks to fit however many repos come back, so there's
-  // no fixed-size carousel to page through.
   let insertAfter = introSection;
   const cards = repos.map((repo, i) => {
     const { section, el } = buildProjectSection(repo, i);
@@ -661,7 +694,7 @@ async function initProjects() {
 // shading the same way the static content sections do.
 function buildProjectSection(repo, index) {
   const section = document.createElement('section');
-  section.className = 'panel project-panel' + (index % 2 === 1 ? ' alt' : '');
+  section.className = 'panel project-panel';
   section.setAttribute('data-hex-fill', '');
 
   const box = document.createElement('div');
