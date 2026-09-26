@@ -1,8 +1,3 @@
-// ---------------------------------------------
-// 1. Core solver: find optimal hexagon count/width
-//    for a given viewport width, constrained to
-//    [minWidth, maxWidth], closest to target.
-// ---------------------------------------------
 function getOptimalHexGrid(viewportWidth, minWidth = 60, maxWidth = 100, target = 80) {
   const minCount = Math.ceil(viewportWidth / maxWidth);
   const maxCount = Math.floor(viewportWidth / minWidth);
@@ -27,11 +22,9 @@ function getOptimalHexGrid(viewportWidth, minWidth = 60, maxWidth = 100, target 
   return best;
 }
 
-// ---------------------------------------------
-// 2. Pointy-top hexagon geometry helpers
-//    width  = sqrt(3) * size
-//    height = 2 * size
-// ---------------------------------------------
+// Pointy-top hexagon geometry helpers
+// width  = sqrt(3) * size
+// height = 2 * size
 function hexCorner(cx, cy, size, i) {
   const angleDeg = 60 * i - 30; // pointy-top offset
   const angleRad = (Math.PI / 180) * angleDeg;
@@ -63,11 +56,9 @@ function fillHex(ctx, cx, cy, size, fillStyle) {
   ctx.fill();
 }
 
-// ---------------------------------------------
 // Color interpolation for the gradient column.
 // Reads two hex colors ("#rrggbb") and blends them
 // by t (0 -> colorA, 1 -> colorB).
-// ---------------------------------------------
 function hexToRgb(hex) {
   const n = parseInt(hex.replace('#', ''), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -82,21 +73,12 @@ function lerpColor(hexA, hexB, t) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Inverts an "rgb(r, g, b)" string — used when hovering a hex
-// that's already part of the gradient/highlight/fill system.
+// Inverts an "rgb(r, g, b)" string — used when hovering a hex thats already part of the gradient/highlight/fill system.
 function invertColor(rgbStr) {
   const [r, g, b] = rgbStr.match(/\d+/g).map(Number);
   return `rgb(${255 - r}, ${255 - g}, ${255 - b})`;
 }
 
-// ---------------------------------------------
-// Edge detection: find hexagons sitting on the
-// boundary of any element tagged [data-hex-highlight].
-// ---------------------------------------------
-
-// Bounding box of an element in DOCUMENT coordinates
-// (not viewport coordinates — accounts for scroll,
-// since our canvas covers the whole page).
 function getDocRect(el) {
   const r = el.getBoundingClientRect();
   const scrollX = window.scrollX || window.pageXOffset;
@@ -127,20 +109,20 @@ function isHexOnRectEdge(cx, cy, threshold, rect) {
   return distanceToRectEdge(cx, cy, rect) <= threshold;
 }
 
-// True if a point sits fully inside a rect (used for data-hex-fill,
-// where we want the whole interior colored in, not just the edge band).
+// True if a point sits fully inside a rect (used for data-hex-fill, where we want the whole interior colored in, not just the edge band).
 function isPointInRect(px, py, rect) {
   return px >= rect.left && px <= rect.right && py >= rect.top && py <= rect.bottom;
 }
 
-// ---------------------------------------------
-// Road generation: a self-avoiding walk across the
-// hex grid's (col, row) graph, planned fully in memory
-// before anything is drawn.
-// ---------------------------------------------
+// Road generation: a self-avoiding walk across the hex grid's (col, row) graph, planned fully in memory before anything is drawn.
 
 function keyOf(c, r) {
   return c + ',' + r;
+}
+
+function keyToCell(key) {
+  const [c, r] = key.split(',').map(Number);
+  return [c, r];
 }
 
 function shuffleArray(arr) {
@@ -151,9 +133,6 @@ function shuffleArray(arr) {
   return arr;
 }
 
-// Neighbor offsets for "odd-r" pointy-top offset coordinates —
-// matches this file's row layout, where odd rows are shifted
-// right by half a hex width (see offsetX in renderGrid).
 function getHexNeighbors(c, r) {
   const evenRow = (r % 2 === 0);
   return evenRow
@@ -161,22 +140,6 @@ function getHexNeighbors(c, r) {
     : [[c - 1, r], [c + 1, r], [c, r - 1], [c + 1, r - 1], [c, r + 1], [c + 1, r + 1]];
 }
 
-// Plans a full self-avoiding path before any rendering happens.
-// A candidate cell is only accepted if none of ITS neighbors are
-// already part of the path (except the cell we're stepping from) —
-// that's the "always 1 hex away from its own prior path" rule.
-//
-// Success is defined as REACHING rowTarget (e.g. 95% down the page),
-// not just hitting some length — a path can easily rack up steps by
-// wandering back and forth without ever getting near the bottom, so
-// length alone doesn't guarantee a good-looking cutoff there.
-//
-// Candidates are weighted (not just shuffled) to favor downward moves,
-// so it's more likely to reach the target before running out of room,
-// while still being free to double back — that's what keeps it looking
-// organic instead of a straight line. If one attempt dead-ends before
-// reaching the target, it restarts from scratch with a new random
-// order rather than fighting the same trapped branch forever.
 function generateRoadPath({ start, colMin, colMax, rowMin, rowMax, rowTarget, forbidden, maxAttemptsPerRestart, maxRestarts }) {
   let bestPath = [start];
   let bestReachRow = start[1];
@@ -245,40 +208,143 @@ function generateRoadPath({ start, colMin, colMax, rowMin, rowMax, rowTarget, fo
     backtrack();
     if (succeeded) return path;
   }
-
-  // Didn't reach the target in any restart — return the closest attempt
-  // found rather than nothing. (Tested: this branch essentially never
-  // triggers on realistic grid sizes with the settings used below.)
   return bestPath;
 }
 
-// Widens a single-cell-wide path into a 2-hex-wide road. For each
-// center cell, randomly pick one adjacent, unclaimed, non-forbidden
-// neighbor as its pair — side varies per segment for an organic look.
-function widenRoadPath(path, forbidden) {
-  const centerSet = new Set(path.map(([c, r]) => keyOf(c, r)));
-  const usedPairs = new Set();
-  const roadCells = new Set(centerSet);
+function bidirectionalPath(start, target, colMin, colMax, rowMin, rowMax, forbidden) {
+  const startKey = keyOf(start[0], start[1]);
+  const targetKey = keyOf(target[0], target[1]);
 
-  for (const [c, r] of path) {
-    const neighbors = shuffleArray(getHexNeighbors(c, r));
-    for (const [nc, nr] of neighbors) {
-      const nkey = keyOf(nc, nr);
-      if (centerSet.has(nkey) || usedPairs.has(nkey) || forbidden.has(nkey)) continue;
-      usedPairs.add(nkey);
-      roadCells.add(nkey);
-      break;
-    }
-    // If every neighbor was already claimed/forbidden, that segment
-    // just stays 1 hex wide — a rare, minor edge case rather than a crash.
+  function inBounds(cell) {
+    return cell[0] >= colMin && cell[0] <= colMax && cell[1] >= rowMin && cell[1] <= rowMax;
   }
 
-  return roadCells;
+  const cameFromStart = new Map([[startKey, null]]);
+  const cameFromTarget = new Map([[targetKey, null]]);
+  let frontierStart = [start];
+  let frontierTarget = [target];
+  let meetKey = null;
+
+  const maxSteps = (colMax - colMin + 1) * (rowMax - rowMin + 1);
+
+  for (let step = 0; step < maxSteps && !meetKey; step++) {
+    const expandStart = frontierStart.length <= frontierTarget.length;
+    const frontier = expandStart ? frontierStart : frontierTarget;
+    const cameFrom = expandStart ? cameFromStart : cameFromTarget;
+    const otherCameFrom = expandStart ? cameFromTarget : cameFromStart;
+
+    const nextFrontier = [];
+    for (const cell of frontier) {
+      for (const n of shuffleArray(getHexNeighbors(cell[0], cell[1]))) {
+        if (!inBounds(n)) continue;
+        const nkey = keyOf(n[0], n[1]);
+        if (forbidden.has(nkey) || cameFrom.has(nkey)) continue;
+        cameFrom.set(nkey, cell);
+        nextFrontier.push(n);
+        if (otherCameFrom.has(nkey)) { meetKey = nkey; break; }
+      }
+      if (meetKey) break;
+    }
+
+    if (expandStart) frontierStart = nextFrontier; else frontierTarget = nextFrontier;
+    if (nextFrontier.length === 0 && !meetKey) break; // both sides exhausted, unreachable
+  }
+
+  if (!meetKey) return null;
+
+  // Walk parent pointers from the meeting point back to each root,
+  // then splice the two halves together into one start->target path.
+  function chainToRoot(cameFrom, fromKey) {
+    const chain = [];
+    let curKey = fromKey;
+    while (curKey !== null) {
+      chain.push(keyToCell(curKey));
+      const parent = cameFrom.get(curKey);
+      curKey = parent ? keyOf(parent[0], parent[1]) : null;
+    }
+    return chain;
+  }
+
+  const startHalf = chainToRoot(cameFromStart, meetKey).reverse(); // start ... meet
+  const targetHalf = chainToRoot(cameFromTarget, meetKey);          // meet ... target
+  return startHalf.concat(targetHalf.slice(1));
 }
 
-// ---------------------------------------------
-// 3. Build + render the full-page tessellation
-// ---------------------------------------------
+function freeStrandWalk({ start, colMin, colMax, rowMin, rowMax, forbidden, maxSteps }) {
+  const path = [start];
+  const visited = new Set([keyOf(start[0], start[1])]);
+  let current = start;
+
+  for (let step = 0; step < maxSteps; step++) {
+    const candidates = getHexNeighbors(current[0], current[1])
+      .filter(([c, r]) => c >= colMin && c <= colMax && r >= rowMin && r <= rowMax)
+      .filter(([c, r]) => !forbidden.has(keyOf(c, r)) && !visited.has(keyOf(c, r)))
+      .map(cand => {
+        const rowDelta = cand[1] - current[1];
+        const bias = rowDelta > 0 ? 0.5 : (rowDelta === 0 ? 0 : -0.5);
+        return { cand, score: Math.random() + bias };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    if (candidates.length === 0) break; // dead end — the strand just ends here
+
+    current = candidates[0].cand;
+    path.push(current);
+    visited.add(keyOf(current[0], current[1]));
+  }
+
+  return path;
+}
+
+// Produces one width value per skeleton cell
+function organicWidths(pathLength, startWidth, maxWidth) {
+  const widths = [];
+  let w = startWidth;
+  for (let i = 0; i < pathLength; i++) {
+    widths.push(Math.max(1, Math.round(w)));
+    const roll = Math.random();
+    const delta = roll < 0.3 ? -1 : (roll > 0.7 ? 1 : 0);
+    w = Math.min(maxWidth, Math.max(1, w + delta));
+  }
+  return widths;
+}
+
+// How far down its available room a strand actually runs before ending
+function strandLifeFraction() {
+  return 0.35 + 0.65 * Math.sqrt(Math.random());
+}
+
+function taperToEnd(widths) {
+  const tailStart = Math.floor(widths.length * 0.85);
+  return widths.map((w, i) => {
+    if (i < tailStart) return w;
+    const t = (i - tailStart) / Math.max(1, widths.length - tailStart);
+    return Math.max(1, Math.round(w * (1 - t)));
+  });
+}
+
+// Widens a skeleton path into a variable-width band by claiming up to (width - 1) extra unclaimed, non-forbidden neighbor hexes per cell.
+function widenVariable(path, widths, forbidden, claimed) {
+  path.forEach(([c, r], i) => {
+    const key = keyOf(c, r);
+    if (forbidden.has(key)) return;
+    claimed.add(key);
+
+    const extra = Math.max(0, (widths[i] ?? 1) - 1);
+    if (extra === 0) return;
+
+    let added = 0;
+    for (const [nc, nr] of shuffleArray(getHexNeighbors(c, r))) {
+      if (added >= extra) break;
+      const nkey = keyOf(nc, nr);
+      if (claimed.has(nkey) || forbidden.has(nkey)) continue;
+      claimed.add(nkey);
+      added++;
+    }
+  });
+}
+
+// Build + render the full-page tessellation
 const canvas = document.getElementById('hexCanvas');
 const ctx = canvas.getContext('2d');
 const hoverCanvas = document.getElementById('hexHoverCanvas');
@@ -329,44 +395,52 @@ function renderGrid() {
   ).map(getDocRect);
   const edgeThreshold = size * 1;
 
-  // ---------------------------------------------
-  // Generate the road: a fresh random path every time the page
-  // loads. Starts at the same spot the old right-hand column did
-  // (top row, one hex in from the right edge) and wanders freely.
-  // ---------------------------------------------
-  const roadColMax = grid.count - 4;
+  const roadColMax = grid.count;
   const roadRowMax = Math.ceil(docHeight / vertStep);
-
-  // Cells that fall on/inside a data-hex-highlight box are off-limits
-  // to the road (fill boxes are fine to run behind).
   const roadForbidden = new Set();
-  for (let r = 0; r <= roadRowMax; r++) {
-    const offsetX = (r % 2 !== 0) ? hexWidth / 2 : 0;
-    for (let c = 0; c <= roadColMax; c++) {
-      const x = c * hexWidth + offsetX;
-      const y = r * vertStep;
-      const onHighlight = highlightRects.some(rect =>
-        isHexOnRectEdge(x, y, edgeThreshold, rect) || isPointInRect(x, y, rect)
-      );
-      if (onHighlight) roadForbidden.add(keyOf(c, r));
+  const claimed = new Set();
+  const numStrands = 5;
+  const segmentWidth = (roadColMax + 1) / numStrands;
+  const splitCols = Array.from({ length: numStrands }, (_, i) => {
+    const segStart = Math.floor(i * segmentWidth);
+    const segEnd = Math.min(roadColMax, Math.floor((i + 1) * segmentWidth) - 1);
+    return segStart + Math.floor(Math.random() * Math.max(1, segEnd - segStart + 1));
+  });
+
+  const funnelRows = 6;
+  const funnelMouthHalfWidth = Math.ceil(segmentWidth / 2) + 1;
+  const funnelBaseHalfWidth = 1;
+
+  for (let r = 0; r <= funnelRows; r++) {
+    const t = r / funnelRows;
+    const halfWidth = Math.round(
+      funnelMouthHalfWidth + (funnelBaseHalfWidth - funnelMouthHalfWidth) * t
+    );
+    for (const splitCol of splitCols) {
+      for (let dc = -halfWidth; dc <= halfWidth; dc++) {
+        const c = splitCol + dc;
+        if (c < 0 || c > roadColMax) continue;
+        claimed.add(keyOf(c, r));
+      }
     }
   }
 
-  const roadPath = generateRoadPath({
-    start: [roadColMax, 0],
-    colMin: 0,
-    colMax: roadColMax,
-    rowMin: 0,
-    rowMax: roadRowMax,
-    // Reach ~95% of the way down the page for a clean cutoff near
-    // the bottom, rather than just accumulating enough steps.
-    rowTarget: Math.floor(roadRowMax * 0.95),
-    forbidden: roadForbidden,
-    maxAttemptsPerRestart: 15000,
-    maxRestarts: 8
-  });
+  const splitRow = funnelRows;
+  const splitOrigins = splitCols.map(c => [c, splitRow]);
 
-  const roadCells = widenRoadPath(roadPath, roadForbidden);
+  for (const origin of splitOrigins) {
+    const skeleton = freeStrandWalk({
+      start: origin, colMin: 0, colMax: roadColMax,
+      rowMin: 0, rowMax: roadRowMax, forbidden: roadForbidden,
+      maxSteps: roadRowMax
+    });
+    const lifeLength = Math.max(3, Math.round(skeleton.length * strandLifeFraction()));
+    const trimmedSkeleton = skeleton.slice(0, lifeLength);
+    const widths = taperToEnd(organicWidths(trimmedSkeleton.length, 2, 3));
+    widenVariable(trimmedSkeleton, widths, roadForbidden, claimed);
+  }
+
+  const roadCells = claimed;
 
   for (let r = -1; r <= rows; r++) {
     const y = r * vertStep;
@@ -398,19 +472,13 @@ function renderGrid() {
         fillHex(ctx, x, y, size, scaleColor);
         ctx.restore();
       }
-      // else: hex is unused — skip drawing entirely, stays invisible
     }
   }
 
-  // Cache everything hover needs so it never has to touch the
-  // full grid loop or requery the DOM on mouse movement.
   gridState = {
     docHeight, size, hexWidth, vertStep,
     colorTop, colorBottom, highlightRects, fillRects, edgeThreshold, roadCells
   };
-
-  // The base grid changed (resize/load) — refresh the hover hex too,
-  // since its position/size are now stale otherwise.
   renderHover();
 
   statsEl.textContent =
@@ -418,10 +486,8 @@ function renderGrid() {
     `hex width: ${grid.hexWidth.toFixed(2)}px  |  hex size (circumradius): ${size.toFixed(2)}px`;
 }
 
-// ---------------------------------------------
 // Cheap, per-frame hover redraw. Only touches the small
 // hover canvas layered on top — never repaints the full grid.
-// ---------------------------------------------
 function renderHover() {
   hoverCtx.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
 
@@ -434,9 +500,6 @@ function renderHover() {
 
   let closest = null;
 
-  // Reverse-map the cursor to an approximate (row, col), then
-  // check a small neighborhood (3x3) since pointy-top offset rows
-  // mean the true nearest center isn't always the naive guess.
   for (let dr = -1; dr <= 1; dr++) {
     const rGuess = Math.round(mouse.y / vertStep) + dr;
     const rowOffsetX = (rGuess % 2 !== 0) ? hexWidth / 2 : 0;
@@ -453,8 +516,6 @@ function renderHover() {
     }
   }
 
-  // Only light up if the cursor is genuinely within this hex,
-  // not just nearest to it from far away.
   if (!closest || closest.dist > size) return;
 
   const hoverT = Math.min(Math.max(closest.cy / docHeight, 0), 1);
@@ -471,8 +532,8 @@ function renderHover() {
   const wasActive = wasEdge || wasFillInterior || roadCells.has(keyOf(closest.c, closest.r));
 
   const hoverColor = wasActive
-    ? invertColor(hoverGradientColor)  // already colored -> invert
-    : hoverGradientColor;              // background -> gradient at this point
+    ? invertColor(hoverGradientColor)
+    : hoverGradientColor; 
 
   hoverCtx.save();
   hoverCtx.shadowColor = hoverColor;
@@ -481,9 +542,6 @@ function renderHover() {
   hoverCtx.restore();
 }
 
-// ---------------------------------------------
-// 4. Recalculate on resize (debounced) and on load
-// ---------------------------------------------
 let resizeTimeout;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimeout);
@@ -492,15 +550,8 @@ window.addEventListener('resize', () => {
 
 window.addEventListener('load', renderGrid);
 
-// Recalculate once more shortly after load in case fonts/images
-// shift the document height.
 setTimeout(renderGrid, 300);
 
-// ---------------------------------------------
-// 5. Hover tracking — throttled to one redraw per
-//    animation frame so fast mouse movement doesn't
-//    trigger a flood of full-grid redraws.
-// ---------------------------------------------
 let hoverRafPending = false;
 function scheduleHoverRender() {
   if (hoverRafPending) return;
