@@ -7,7 +7,7 @@
 html, body {
   width: 100%;
   background: #fdeaca;
-  color: #eae7dd;
+  color: #444441;
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
@@ -59,7 +59,7 @@ main {
   font-size: clamp(2.2rem, 5vw, 4rem);
   margin-bottom: 1rem;
   letter-spacing: -0.02em;
-  color: #faeeda;
+  color: #444441;
 }
 
 .panel h2 {
@@ -81,7 +81,7 @@ main {
   padding: 2% 2% 2% 2%;
 }
 
-.content h2, p {
+.content h2, .content p {
   color: #444441;
 }
 
@@ -123,7 +123,7 @@ main {
   backdrop-filter: blur(2px);
 }
 
-.hex-fill-box h2, p {
+.hex-fill-box h2, .hex-fill-box p {
   margin-bottom: 1rem;
   color: #faeeda;
 }
