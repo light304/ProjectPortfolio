@@ -317,22 +317,17 @@ function renderGrid() {
 
   const rows = Math.ceil(docHeight / vertStep) + 2;
 
-  // Shared gradient scale — used by the right-hand road, highlighted
-  // container edges, and hover, so color always reflects the same
-  // position down the page regardless of which feature it's on.
-  const colorTop = '#1b4332';    // deep forest green
-  const colorBottom = '#EF9F27'; // amber
+  // Shared gradient scale
+  const colorTop = '#1b4332';
+  const colorBottom = '#EF9F27';
 
-  // Two flavors of tagged element:
-  // - data-hex-highlight: only the edge band lights up (pure outline)
-  // - data-hex-fill:      edge band AND the full interior light up
   const highlightRects = Array.from(
     document.querySelectorAll('[data-hex-highlight]')
   ).map(getDocRect);
   const fillRects = Array.from(
     document.querySelectorAll('[data-hex-fill]')
   ).map(getDocRect);
-  const edgeThreshold = size * 1; // how "thick" the outline band reads
+  const edgeThreshold = size * 1;
 
   // ---------------------------------------------
   // Generate the road: a fresh random path every time the page
@@ -529,3 +524,241 @@ window.addEventListener('mouseleave', () => {
   mouse.y = null;
   scheduleHoverRender();
 });
+
+// ---------------------------------------------
+// 6. Live GitHub project showcase.
+//
+// Pulls every public, non-fork repo from GITHUB_USERNAME and builds a
+// full dedicated section per project: description (falls back to the
+// repo's README if the repo itself has none set), and a shuffling "3D"
+// image frame. Sections are appended one after another below the intro
+// section, so the page's total length is dynamic — it grows or shrinks
+// to fit however many repos come back, with nothing to scroll through
+// a fixed-size carousel for.
+//
+// Images for a project come from, in order of preference:
+//   1. images/projects/<repo-name>/manifest.json — a JSON array of
+//      filenames living alongside this site, e.g. ["1.jpg","2.jpg"].
+//      This is the easiest way to control exactly what shows and in
+//      what order, without touching the project's own repo.
+//   2. A guessed numbered sequence at the same path (1.jpg, 2.png, ...)
+//      for projects that just dropped files in without a manifest.
+//   3. GitHub's own auto-generated social preview image for the repo,
+//      as a last resort so a card is never empty.
+// ---------------------------------------------
+const GITHUB_USERNAME = 'light304';
+// Add a repo's exact name here to hide it from the showcase (e.g. this
+// portfolio's own repo, or anything not meant to be shown publicly).
+const EXCLUDED_REPOS = [];
+const IMAGE_BASE_PATH = 'images/projects/';
+const MAX_GUESSED_IMAGES = 4;
+const SLIDE_INTERVAL_MS = 4200;
+
+async function initProjects() {
+  const introSection = document.getElementById('projectsIntro');
+  const status = document.getElementById('projectStatus');
+  if (!introSection) return;
+
+  let repos;
+  try {
+    const res = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&sort=updated`);
+    if (!res.ok) throw new Error(`GitHub responded ${res.status}`);
+    repos = await res.json();
+  } catch (err) {
+    console.warn('GitHub project fetch failed:', err);
+    if (status) {
+      status.textContent =
+        `Couldn't load projects from GitHub just now — see them directly at github.com/${GITHUB_USERNAME}.`;
+    }
+    return;
+  }
+
+  repos = repos
+    .filter(r => !r.fork && !r.archived && !EXCLUDED_REPOS.includes(r.name))
+    .sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
+
+  if (repos.length === 0) {
+    if (status) status.textContent = 'No public projects to show yet — check back soon.';
+    return;
+  }
+
+  if (status) status.remove();
+
+  // Build one full-page section per project and splice them in, in
+  // order, right after the intro section — the page's total length
+  // grows or shrinks to fit however many repos come back, so there's
+  // no fixed-size carousel to page through.
+  let insertAfter = introSection;
+  const cards = repos.map((repo, i) => {
+    const { section, el } = buildProjectSection(repo, i);
+    insertAfter.after(section);
+    insertAfter = section;
+    return { repo, el };
+  });
+
+  // Descriptions and images resolve independently per section so one
+  // slow or missing README never holds up the rest.
+  await Promise.all(cards.map(({ repo, el }) => hydrateProjectCard(repo, el)));
+
+  // Section count (and therefore total document height) just changed —
+  // let the hex grid recompute against the new layout.
+  if (typeof renderGrid === 'function') renderGrid();
+}
+
+// Builds one full <section> (matching the site's existing full-height
+// panel pattern) dedicated to a single repo, alternating background
+// shading the same way the static content sections do.
+function buildProjectSection(repo, index) {
+  const section = document.createElement('section');
+  section.className = 'panel project-panel' + (index % 2 === 1 ? ' alt' : '');
+  section.setAttribute('data-hex-fill', '');
+
+  const box = document.createElement('div');
+  box.className = 'hex-fill-box project-box';
+  box.innerHTML = `
+    <div class="project-card-body">
+      <h3>${escapeHtml(prettifyRepoName(repo.name))}</h3>
+      <p class="project-desc" data-desc>Loading description…</p>
+      <div class="project-meta">
+        ${repo.language ? `<span class="meta-pill">${escapeHtml(repo.language)}</span>` : ''}
+        <span class="meta-pill">Updated ${formatMonthYear(repo.pushed_at)}</span>
+      </div>
+      <a class="project-link" href="${repo.html_url}" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+    <div class="showcase-frame" data-frame></div>
+  `;
+  section.appendChild(box);
+  return { section, el: box };
+}
+
+async function hydrateProjectCard(repo, el) {
+  const descEl = el.querySelector('[data-desc]');
+  const frameEl = el.querySelector('[data-frame]');
+
+  const [description, images] = await Promise.all([
+    resolveDescription(repo),
+    resolveImages(repo)
+  ]);
+
+  if (descEl) descEl.textContent = description;
+  mountShowcase(frameEl, images);
+}
+
+async function resolveDescription(repo) {
+  if (repo.description && repo.description.trim()) return repo.description.trim();
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${repo.name}/readme`, {
+      headers: { Accept: 'application/vnd.github.raw+json' }
+    });
+    if (!res.ok) throw new Error('no readme');
+    const raw = await res.text();
+    const summary = summarizeReadme(raw);
+    if (summary) return summary;
+  } catch (err) {
+    // No README either — fall through to the generic line below.
+  }
+  return 'No description yet — see the README on GitHub for details.';
+}
+
+// Pulls the first real paragraph out of a raw README, skipping
+// headings, badges/images, block quotes, rules and code fences, and
+// stripping inline markdown syntax so it reads as plain text.
+function summarizeReadme(markdown) {
+  const lines = markdown.split('\n');
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) continue;
+    if (/^#{1,6}\s/.test(trimmed)) continue;
+    if (/^!?\[/.test(trimmed)) continue;
+    if (/^(>|```|~~~|---|\*\*\*|===)/.test(trimmed)) continue;
+
+    const clean = trimmed
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/[*_`#]/g, '')
+      .trim();
+
+    if (clean.length > 20) {
+      return clean.length > 220 ? clean.slice(0, 217).trim() + '…' : clean;
+    }
+  }
+  return null;
+}
+
+async function resolveImages(repo) {
+  const base = `${IMAGE_BASE_PATH}${repo.name}/`;
+
+  try {
+    const res = await fetch(`${base}manifest.json`, { cache: 'no-store' });
+    if (res.ok) {
+      const list = await res.json();
+      if (Array.isArray(list) && list.length) {
+        return list.map(name => base + name);
+      }
+    }
+  } catch (err) {
+    // No manifest — fall through to guessing.
+  }
+
+  const guesses = [];
+  for (let i = 1; i <= MAX_GUESSED_IMAGES; i++) {
+    for (const ext of ['jpg', 'png', 'webp']) {
+      guesses.push(`${base}${i}.${ext}`);
+    }
+  }
+  const found = (await Promise.all(guesses.map(probeImage))).filter(Boolean);
+  if (found.length) return found;
+
+  return [`https://opengraph.githubassets.com/1/${GITHUB_USERNAME}/${repo.name}`];
+}
+
+function probeImage(src) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(src);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+function mountShowcase(frameEl, images) {
+  if (!frameEl) return;
+  frameEl.innerHTML = '';
+
+  images.forEach((src, i) => {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.className = 'showcase-img' + (i === 0 ? ' active' : '');
+    frameEl.appendChild(img);
+  });
+
+  if (images.length <= 1) return;
+
+  let index = 0;
+  setInterval(() => {
+    const imgs = frameEl.querySelectorAll('.showcase-img');
+    if (!imgs.length) return;
+    imgs[index].classList.remove('active');
+    index = (index + 1) % imgs.length;
+    imgs[index].classList.add('active');
+  }, SLIDE_INTERVAL_MS);
+}
+
+function prettifyRepoName(name) {
+  return name.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatMonthYear(iso) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+window.addEventListener('load', initProjects);
