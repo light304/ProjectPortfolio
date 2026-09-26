@@ -383,19 +383,17 @@ function renderGrid() {
 
   const rows = Math.ceil(docHeight / vertStep) + 2;
 
+  // Shared gradient scale
   const colorTop = '#1b4332';
   const colorBottom = '#EF9F27';
 
-  // Two flavors of tagged element:
-  // - data-hex-highlight: only the edge band lights up (pure outline)
-  // - data-hex-fill:      edge band AND the full interior light up
   const highlightRects = Array.from(
     document.querySelectorAll('[data-hex-highlight]')
   ).map(getDocRect);
   const fillRects = Array.from(
     document.querySelectorAll('[data-hex-fill]')
   ).map(getDocRect);
-  const edgeThreshold = size * 1; // how "thick" the outline band reads
+  const edgeThreshold = size * 1;
 
   const roadColMax = grid.count;
   const roadRowMax = Math.ceil(docHeight / vertStep);
@@ -663,7 +661,7 @@ async function initProjects() {
 // shading the same way the static content sections do.
 function buildProjectSection(repo, index) {
   const section = document.createElement('section');
-  section.className = 'panel project-panel';
+  section.className = 'panel project-panel' + (index % 2 === 1 ? ' alt' : '');
   section.setAttribute('data-hex-fill', '');
 
   const box = document.createElement('div');
