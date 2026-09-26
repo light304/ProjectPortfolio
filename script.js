@@ -79,6 +79,12 @@ function invertColor(rgbStr) {
   return `rgb(${255 - r}, ${255 - g}, ${255 - b})`;
 }
 
+function darkenColor(rgbStr, amount) {
+  const [r, g, b] = rgbStr.match(/\d+/g).map(Number);
+  const f = 1 - amount;
+  return `rgb(${Math.round(r * f)}, ${Math.round(g * f)}, ${Math.round(b * f)})`;
+}
+
 function getDocRect(el) {
   const r = el.getBoundingClientRect();
   const scrollX = window.scrollX || window.pageXOffset;
@@ -387,18 +393,23 @@ function renderGrid() {
   const colorTop = '#1b4332';
   const colorBottom = '#EF9F27';
 
+  // Two types of tagged element:
+  // - data-hex-highlight: only the edge band lights up (pure outline)
+  // - data-hex-fill:      edge band AND the full interior light up
   const highlightRects = Array.from(
     document.querySelectorAll('[data-hex-highlight]')
   ).map(getDocRect);
   const fillRects = Array.from(
     document.querySelectorAll('[data-hex-fill]')
   ).map(getDocRect);
-  const edgeThreshold = size * 1;
-
+  const edgeThreshold = size * 1; // how "thick" the outline band reads
   const roadColMax = grid.count;
   const roadRowMax = Math.ceil(docHeight / vertStep);
   const roadForbidden = new Set();
-  const claimed = new Set();
+  const frontCells = new Set();
+  const middleCells = new Set();
+  const backCells = new Set();
+  const claimed = frontCells; // funnel trunk goes here, see below
   const numStrands = 5;
   const segmentWidth = (roadColMax + 1) / numStrands;
   const splitCols = Array.from({ length: numStrands }, (_, i) => {
@@ -427,8 +438,16 @@ function renderGrid() {
 
   const splitRow = funnelRows;
   const splitOrigins = splitCols.map(c => [c, splitRow]);
+  const depthRampDistance = window.innerHeight * 0.4;
+  const middleDarkenTarget = 0.4; // doubled from 0.2
+  const backDarkenTarget = 0.8;   // doubled from 0.4
+  const planeSets = { front: frontCells, middle: middleCells, back: backCells };
+  const planeAssignments = shuffleArray(
+    Array.from({ length: numStrands }, (_, i) => ['front', 'middle', 'back'][i % 3])
+  );
 
-  for (const origin of splitOrigins) {
+  splitOrigins.forEach((origin, i) => {
+    const targetSet = planeSets[planeAssignments[i]];
     const skeleton = freeStrandWalk({
       start: origin, colMin: 0, colMax: roadColMax,
       rowMin: 0, rowMax: roadRowMax, forbidden: roadForbidden,
@@ -437,10 +456,8 @@ function renderGrid() {
     const lifeLength = Math.max(3, Math.round(skeleton.length * strandLifeFraction()));
     const trimmedSkeleton = skeleton.slice(0, lifeLength);
     const widths = taperToEnd(organicWidths(trimmedSkeleton.length, 2, 3));
-    widenVariable(trimmedSkeleton, widths, roadForbidden, claimed);
-  }
-
-  const roadCells = claimed;
+    widenVariable(trimmedSkeleton, widths, roadForbidden, targetSet);
+  });
 
   for (let r = -1; r <= rows; r++) {
     const y = r * vertStep;
@@ -448,6 +465,8 @@ function renderGrid() {
     const cols = grid.count + 1;
     const t = Math.min(Math.max(y / docHeight, 0), 1);
     const scaleColor = lerpColor(colorTop, colorBottom, t);
+    // Depth ramp
+    const rampT = Math.min(Math.max(y / depthRampDistance, 0), 1);
 
     for (let c = -1; c <= cols; c++) {
       const x = c * hexWidth + offsetX;
@@ -461,15 +480,26 @@ function renderGrid() {
       const isFillInterior = fillRects.some(rect =>
         isPointInRect(x, y, rect)
       );
-      const isRoadHex = roadCells.has(keyOf(c, r));
+      const cellKey = keyOf(c, r);
+      // Priority front > middle > back — where strands from different
+      // planes overlap, the higher (less darkened) plane wins.
+      const isFrontRoad = frontCells.has(cellKey);
+      const isMiddleRoad = !isFrontRoad && middleCells.has(cellKey);
+      const isBackRoad = !isFrontRoad && !isMiddleRoad && backCells.has(cellKey);
 
-      const isActive = isHighlightEdge || isFillEdge || isFillInterior || isRoadHex;
+      const isActive = isHighlightEdge || isFillEdge || isFillInterior || isFrontRoad || isMiddleRoad || isBackRoad;
 
       if (isActive) {
+        let hexColor = scaleColor;
+        if (!isHighlightEdge && !isFillEdge && !isFillInterior) {
+          if (isMiddleRoad) hexColor = darkenColor(scaleColor, middleDarkenTarget * rampT);
+          else if (isBackRoad) hexColor = darkenColor(scaleColor, backDarkenTarget * rampT);
+        }
+
         ctx.save();
-        ctx.shadowColor = scaleColor;
+        ctx.shadowColor = hexColor;
         ctx.shadowBlur = 14;
-        fillHex(ctx, x, y, size, scaleColor);
+        fillHex(ctx, x, y, size, hexColor);
         ctx.restore();
       }
     }
@@ -477,8 +507,10 @@ function renderGrid() {
 
   gridState = {
     docHeight, size, hexWidth, vertStep,
-    colorTop, colorBottom, highlightRects, fillRects, edgeThreshold, roadCells
+    colorTop, colorBottom, highlightRects, fillRects, edgeThreshold,
+    frontCells, middleCells, backCells
   };
+
   renderHover();
 
   statsEl.textContent =
@@ -486,8 +518,6 @@ function renderGrid() {
     `hex width: ${grid.hexWidth.toFixed(2)}px  |  hex size (circumradius): ${size.toFixed(2)}px`;
 }
 
-// Cheap, per-frame hover redraw. Only touches the small
-// hover canvas layered on top — never repaints the full grid.
 function renderHover() {
   hoverCtx.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
 
@@ -495,7 +525,8 @@ function renderHover() {
 
   const {
     docHeight, size, hexWidth, vertStep,
-    colorTop, colorBottom, highlightRects, fillRects, edgeThreshold, roadCells
+    colorTop, colorBottom, highlightRects, fillRects, edgeThreshold,
+    frontCells, middleCells, backCells
   } = gridState;
 
   let closest = null;
@@ -529,11 +560,14 @@ function renderHover() {
   const wasFillInterior = fillRects.some(rect =>
     isPointInRect(closest.cx, closest.cy, rect)
   );
-  const wasActive = wasEdge || wasFillInterior || roadCells.has(keyOf(closest.c, closest.r));
+  const wasActive = wasEdge || wasFillInterior ||
+    frontCells.has(keyOf(closest.c, closest.r)) ||
+    middleCells.has(keyOf(closest.c, closest.r)) ||
+    backCells.has(keyOf(closest.c, closest.r));
 
   const hoverColor = wasActive
-    ? invertColor(hoverGradientColor)
-    : hoverGradientColor; 
+    ? invertColor(hoverGradientColor)  // already colored -> invert
+    : hoverGradientColor;              // background -> gradient at this point
 
   hoverCtx.save();
   hoverCtx.shadowColor = hoverColor;
