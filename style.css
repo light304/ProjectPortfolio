@@ -127,3 +127,140 @@ main {
   margin-bottom: 1rem;
   color: #faeeda;
 }
+
+/* Live GitHub project showcase — one full section per repo, text left / image right. */
+
+.projects-panel {
+  min-height: auto;
+  padding-top: 10vh;
+  padding-bottom: 10vh;
+  background: inherit;
+}
+
+.projects-box {
+  max-width: 70%;
+}
+
+.projects-intro {
+  max-width: 60ch;
+  margin: 0 auto 1.5rem;
+  opacity: 0.85;
+}
+
+.projects-intro a {
+  color: #faeeda;
+}
+
+.project-status {
+  opacity: 0.75;
+  font-style: italic;
+}
+
+/* Each repo gets its own section (built in JS) */
+.project-panel {
+  min-height: auto;
+  padding: 4vh 3vw;
+  margin: 40vh 0;
+  align-items: center;
+}
+
+.project-box {
+  width: 94%;
+  max-width: none;
+  display: flex;
+  align-items: center;
+  gap: 4%;
+  text-align: left;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.project-card-body {
+  flex: 0 0 50%;
+  max-width: 50%;
+  padding: 1.2rem 0 1.2rem 1.4rem;
+}
+
+.showcase-frame {
+  position: relative;
+  flex: 0 0 40%;
+  max-width: 40%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: #0a0f0a;
+}
+
+.project-card-body h3 {
+  font-size: 1.2rem;
+  margin-bottom: 0.6rem;
+  color: #faeeda;
+}
+
+.project-desc {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  opacity: 0.9;
+  min-height: 2.6em;
+  color: #faeeda;
+}
+
+.project-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 1.2rem;
+}
+
+.meta-pill {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(250, 238, 218, 0.3);
+  color: #faeeda;
+  opacity: 0.85;
+  border-radius: 3px;
+}
+
+.project-link {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #faeeda;
+  border-bottom: 1px solid rgba(250, 238, 218, 0.5);
+  padding-bottom: 2px;
+}
+
+.project-link:hover {
+  opacity: 0.7;
+}
+
+@media (max-width: 760px) {
+  .project-box {
+    flex-direction: column;
+    align-items: stretch;
+    width: 90%;
+  }
+
+  .project-card-body,
+  .showcase-frame {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .project-card-body {
+    padding: 1.2rem 0;
+  }
+}
+
+.showcase-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 1.1s ease;
+}
+
+.showcase-img.active {
+  opacity: 1;
+}
