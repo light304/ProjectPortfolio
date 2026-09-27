@@ -439,8 +439,8 @@ function renderGrid() {
   const splitRow = funnelRows;
   const splitOrigins = splitCols.map(c => [c, splitRow]);
   const depthRampDistance = window.innerHeight * 2;
-  const middleDarkenTarget = 0.3;
-  const backDarkenTarget = 0.5;
+  const middleDarkenTarget = 0.15;
+  const backDarkenTarget = 0.3;
   const planeSets = { front: frontCells, middle: middleCells, back: backCells };
   const planeAssignments = shuffleArray(
     Array.from({ length: numStrands }, (_, i) => ['front', 'middle', 'back'][i % 3])
