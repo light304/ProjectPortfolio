@@ -4,7 +4,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   background: #fdeaca;
   color: #444441;
@@ -47,10 +48,6 @@ main {
   min-height: 65vh;
 }
 
-.alt {
-  background-color: rgba(143, 220, 160, 0.2);
-}
-
 .panel.footer {
   min-height: 65vh;
 }
@@ -69,9 +66,15 @@ main {
 }
 
 .panel p {
-  max-width: 60ch;
+  max-width: 90ch;
   line-height: 1.6;
   font-size: 1.05rem;
+}
+
+[data-hex-fill] h1,
+[data-hex-fill] h2,
+[data-hex-fill] p {
+  color: #faeeda;
 }
 
 .content {
@@ -81,17 +84,24 @@ main {
   padding: 2% 2% 2% 2%;
 }
 
-.content h2, .content p {
+.content h2,
+.content p {
   color: #444441;
 }
 
 .stats {
-  margin-top: 2rem;
+  position: absolute;
+  top: 2rem;
+  right: 4vw;
+  margin-top: 0;
+  width: 30vw;
   font-family: 'Courier New', monospace;
   font-size: 0.85rem;
   color: #8fdca0;
   padding: 0.8rem 1rem;
   border-radius: 6px;
+  background: rgba(14, 15, 18, 0.35);
+  backdrop-filter: blur(2px);
   border: 1px solid rgba(143, 220, 160, 0.2);
 }
 
@@ -123,7 +133,8 @@ main {
   backdrop-filter: blur(2px);
 }
 
-.hex-fill-box h2, .hex-fill-box p {
+.hex-fill-box h2,
+.hex-fill-box p {
   margin-bottom: 1rem;
   color: #faeeda;
 }
@@ -141,7 +152,6 @@ main {
 }
 
 .projects-intro {
-  max-width: 60ch;
   margin: 0 auto 1.5rem;
   opacity: 0.85;
 }
@@ -182,11 +192,13 @@ main {
 
 .showcase-frame {
   position: relative;
+  margin-left: 7%;
   flex: 0 0 40%;
-  max-width: 40%;
-  aspect-ratio: 16 / 10;
+  max-width: 35%;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #0a0f0a;
+  box-shadow: -10px 0 24px rgba(0, 0, 0, 0.28);
 }
 
 .project-card-body h3 {
@@ -199,8 +211,125 @@ main {
   font-size: 0.95rem;
   line-height: 1.55;
   opacity: 0.9;
-  min-height: 2.6em;
   color: #faeeda;
+  max-height: min(340px, 42vh);
+  overflow-y: auto;
+  padding-right: 1rem;
+  /* Thin, subtle scrollbar sitting in the gap between text and image. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(250, 238, 218, 0.35) transparent;
+}
+
+.project-desc::-webkit-scrollbar {
+  width: 6px;
+}
+
+.project-desc::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-desc::-webkit-scrollbar-thumb {
+  background-color: rgba(250, 238, 218, 0.35);
+  border-radius: 3px;
+}
+
+.project-desc::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(250, 238, 218, 0.55);
+}
+
+/* Typography for the rendered README markdown inside .project-desc */
+.project-desc :is(h1, h2, h3, h4, h5, h6) {
+  color: #faeeda;
+  line-height: 1.3;
+  margin: 0.9em 0 0.4em;
+}
+
+.project-desc :is(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+
+.project-desc h1 {
+  font-size: 1.2rem;
+}
+
+.project-desc h2 {
+  font-size: 1.1rem;
+}
+
+.project-desc h3,
+.project-desc h4,
+.project-desc h5,
+.project-desc h6 {
+  font-size: 1rem;
+}
+
+.project-desc p {
+  margin: 0.6em 0;
+}
+
+.project-desc ul,
+.project-desc ol {
+  margin: 0.5em 0 0.5em 1.2em;
+}
+
+.project-desc li {
+  margin: 0.25em 0;
+}
+
+.project-desc a {
+  color: #EF9F27;
+}
+
+.project-desc code {
+  background: rgba(250, 238, 218, 0.12);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+.project-desc pre {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.7em;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.project-desc pre code {
+  background: none;
+  padding: 0;
+}
+
+.project-desc blockquote {
+  border-left: 2px solid rgba(239, 159, 39, 0.5);
+  padding-left: 0.8em;
+  margin: 0.6em 0;
+  opacity: 0.85;
+}
+
+.project-desc img {
+  width: 100%;
+  height: auto;
+  border-radius: 3px;
+}
+
+.project-desc hr {
+  border: none;
+  border-top: 1px solid rgba(250, 238, 218, 0.2);
+  margin: 1em 0;
+}
+
+.project-desc table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 0.9em;
+}
+
+.project-desc th,
+.project-desc td {
+  border: 1px solid rgba(250, 238, 218, 0.2);
+  padding: 0.3em 0.6em;
+  text-align: left;
 }
 
 .project-meta {
@@ -262,4 +391,30 @@ main {
 
 .showcase-img.active {
   opacity: 1;
+}
+
+/* Footer contact tags. */
+.contact-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.contact-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid rgba(250, 238, 218, 0.35);
+  border-radius: 4px;
+  color: #faeeda;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.contact-pill:hover {
+  background-color: rgba(250, 238, 218, 0.12);
+  opacity: 0.85;
 }

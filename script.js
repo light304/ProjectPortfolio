@@ -438,9 +438,9 @@ function renderGrid() {
 
   const splitRow = funnelRows;
   const splitOrigins = splitCols.map(c => [c, splitRow]);
-  const depthRampDistance = window.innerHeight * 0.4;
-  const middleDarkenTarget = 0.4; // doubled from 0.2
-  const backDarkenTarget = 0.8;   // doubled from 0.4
+  const depthRampDistance = window.innerHeight * 2;
+  const middleDarkenTarget = 0.15;
+  const backDarkenTarget = 0.3;
   const planeSets = { front: frontCells, middle: middleCells, back: backCells };
   const planeAssignments = shuffleArray(
     Array.from({ length: numStrands }, (_, i) => ['front', 'middle', 'back'][i % 3])
@@ -614,12 +614,13 @@ window.addEventListener('mouseleave', () => {
 // 6. Live GitHub project showcase.
 //
 // Pulls every public, non-fork repo from GITHUB_USERNAME and builds a
-// full dedicated section per project: description (falls back to the
-// repo's README if the repo itself has none set), and a shuffling "3D"
-// image frame. Sections are appended one after another below the intro
-// section, so the page's total length is dynamic — it grows or shrinks
-// to fit however many repos come back, with nothing to scroll through
-// a fixed-size carousel for.
+// full dedicated section per project: description rendered from the
+// repo's own README.md (falls back to the repo's short "About" line,
+// then a generic placeholder, if there's no README or it's empty),
+// and a shuffling "3D" image frame. Sections are appended one after
+// another below the intro section, so the page's total length is
+// dynamic — it grows or shrinks to fit however many repos come back,
+// with nothing to scroll through a fixed-size carousel for.
 //
 // Images for a project come from, in order of preference:
 //   1. images/projects/<repo-name>/manifest.json — a JSON array of
@@ -635,6 +636,17 @@ const GITHUB_USERNAME = 'light304';
 // Add a repo's exact name here to hide it from the showcase (e.g. this
 // portfolio's own repo, or anything not meant to be shown publicly).
 const EXCLUDED_REPOS = [];
+// Repos from GITHUB_USERNAME's own account that should always lead the
+// showcase, in this exact order (everything else follows, most
+// recently pushed first). Matched case-insensitively by name.
+const PINNED_OWN_REPOS = ['Light304', 'ProjectPortfolio'];
+// Pinned repos that live on someone else's account entirely — these
+// aren't in GITHUB_USERNAME's repo list at all, so each is fetched
+// individually and spliced in, in this order, right after
+// PINNED_OWN_REPOS.
+const PINNED_EXTERNAL_REPOS = [
+  { owner: 'dai282', name: 'Moncarog' }
+];
 const IMAGE_BASE_PATH = 'images/projects/';
 const MAX_GUESSED_IMAGES = 4;
 const SLIDE_INTERVAL_MS = 4200;
@@ -658,9 +670,26 @@ async function initProjects() {
     return;
   }
 
-  repos = repos
-    .filter(r => !r.fork && !r.archived && !EXCLUDED_REPOS.includes(r.name))
-    .sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
+  repos = repos.filter(r => !r.fork && !r.archived && !EXCLUDED_REPOS.includes(r.name));
+
+  // Pull the pinned-by-name repos out of the fetched list, in the
+  // exact order requested — everything left over is sorted normally
+  // (most recently pushed first) and follows behind them.
+  const pinnedOwn = [];
+  for (const name of PINNED_OWN_REPOS) {
+    const idx = repos.findIndex(r => r.name.toLowerCase() === name.toLowerCase());
+    if (idx !== -1) pinnedOwn.push(repos.splice(idx, 1)[0]);
+  }
+  repos.sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
+
+  // Pinned repos on another account aren't in that list at all — fetch
+  // each one on its own. A pin that fails to load (renamed, made
+  // private, etc.) is just skipped rather than breaking the page.
+  const pinnedExternal = (await Promise.all(
+    PINNED_EXTERNAL_REPOS.map(({ owner, name }) => fetchSingleRepo(owner, name))
+  )).filter(Boolean);
+
+  repos = [...pinnedOwn, ...pinnedExternal, ...repos];
 
   if (repos.length === 0) {
     if (status) status.textContent = 'No public projects to show yet — check back soon.';
@@ -690,12 +719,23 @@ async function initProjects() {
   if (typeof renderGrid === 'function') renderGrid();
 }
 
-// Builds one full <section> (matching the site's existing full-height
-// panel pattern) dedicated to a single repo, alternating background
-// shading the same way the static content sections do.
+// Fetches a single repo's metadata directly, for pinned repos that
+// live outside GITHUB_USERNAME's own account and so never show up in
+// the bulk repo-list fetch above.
+async function fetchSingleRepo(owner, name) {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}`);
+    if (!res.ok) throw new Error(`GitHub responded ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`Couldn't load pinned repo ${owner}/${name}:`, err);
+    return null;
+  }
+}
+
 function buildProjectSection(repo, index) {
   const section = document.createElement('section');
-  section.className = 'panel project-panel' + (index % 2 === 1 ? ' alt' : '');
+  section.className = 'panel project-panel';
   section.setAttribute('data-hex-fill', '');
 
   const box = document.createElement('div');
@@ -725,25 +765,47 @@ async function hydrateProjectCard(repo, el) {
     resolveImages(repo)
   ]);
 
-  if (descEl) descEl.textContent = description;
+  if (descEl) descEl.innerHTML = description;
   mountShowcase(frameEl, images);
 }
 
-async function resolveDescription(repo) {
-  if (repo.description && repo.description.trim()) return repo.description.trim();
+// Always sourced from the repo's README (rendered as real HTML via
+// marked.js, so headings/lists/bold/links/code all come through) —
+// the "About" one-liner is only used as a last resort if the repo has
+// no README at all, or if marked failed to load.
+// README files almost always open with a "# Project Name" heading that
+// would just duplicate the card's own <h3> title right above it — drop
+// a single leading <h1> (only right at the very start) so the two
+// don't repeat.
+function stripLeadingTitle(html) {
+  return html.replace(/^\s*<h1(?:\s[^>]*)?>.*?<\/h1>\s*/i, '');
+}
 
+async function resolveDescription(repo) {
+  let readmeRaw = null;
   try {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${repo.name}/readme`, {
+    const res = await fetch(`https://api.github.com/repos/${repo.owner.login}/${repo.name}/readme`, {
       headers: { Accept: 'application/vnd.github.raw+json' }
     });
-    if (!res.ok) throw new Error('no readme');
-    const raw = await res.text();
-    const summary = summarizeReadme(raw);
-    if (summary) return summary;
+    if (res.ok) readmeRaw = await res.text();
   } catch (err) {
-    // No README either — fall through to the generic line below.
+    // No README — fall through to the repo description below.
   }
-  return 'No description yet — see the README on GitHub for details.';
+
+  if (readmeRaw && readmeRaw.trim()) {
+    if (typeof marked !== 'undefined' && marked.parse) {
+      return stripLeadingTitle(marked.parse(readmeRaw));
+    }
+    // marked.js didn't load (e.g. offline) — fall back to a plain-text
+    // summary rather than showing nothing.
+    const summary = summarizeReadme(readmeRaw);
+    if (summary) return `<p>${escapeHtml(summary)}</p>`;
+  }
+
+  if (repo.description && repo.description.trim()) {
+    return `<p>${escapeHtml(repo.description.trim())}</p>`;
+  }
+  return '<p>No description yet — see the README on GitHub for details.</p>';
 }
 
 // Pulls the first real paragraph out of a raw README, skipping
@@ -795,7 +857,7 @@ async function resolveImages(repo) {
   const found = (await Promise.all(guesses.map(probeImage))).filter(Boolean);
   if (found.length) return found;
 
-  return [`https://opengraph.githubassets.com/1/${GITHUB_USERNAME}/${repo.name}`];
+  return [`https://opengraph.githubassets.com/1/${repo.owner.login}/${repo.name}`];
 }
 
 function probeImage(src) {

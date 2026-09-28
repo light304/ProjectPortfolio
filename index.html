@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dynamic Pointy-Top Hex Grid</title>
+<title>Cooper Gardyne</title>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" type="image/x-icon" href="images/circle.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 </head>
 <body>
 
@@ -15,30 +16,34 @@
   <main>
     <section class="panel intro" id="hero" data-hex-fill>
       <div class="intro">
-        <h1>Project Portfolio</h1>
-        <p>This website has been created by myself, designed to showcase my skills and ablilty along with the other projects I have either created or taken part of.</p>
-        <p>I hope they take your interest :)</p>
+        <h1>Cooper Gardyne</h1>
+        <p>A showcase of the projects I've built and contributed to — from university coursework to personal builds and full team efforts.</p>
+        <p>Take a look below, and feel free to reach out if anything catches your interest.</p>
         <br>
-        <p>Resize the window and watch the hexagon tessellation recalculate itself to stay within 60–100px wide, closest to 80px.</p>
-        <p class="stats" id="stats">calculating...</p>
+        <p>Try resizing the window — the hexagon grid behind everything recalculates itself live, staying between 60–100px wide, as close to 80px as it can get.</p>
       </div>
+      <p class="stats" id="stats">calculating...</p>
     </section>
 
-    <section class="panel">
+    <section class="panel projects-panel" id="projectsIntro">
       <div class="hex-fill-box projects-box">
         <h2>Projects</h2>
         <p class="projects-intro">Pulled live from <a href="https://github.com/light304" target="_blank" rel="noopener">github.com/light304</a> — each one gets its own section below, and the page grows or shrinks to fit however many are public.</p>
         <p class="project-status" id="projectStatus">Loading projects…</p>
       </div>
     </section>
-
-    <section class="panel projects-panel" id="projectsIntro"></section>
     <!-- One full section per repo is inserted here dynamically by script.js -->
 
     <section class="panel footer" data-hex-fill>
       <div class="footer">
-        <h2>End</h2>
-        <p>That's the baseline. From here, section edges/dividers can be snapped to hex vertices instead of being purely decorative overlay.</p>
+        <h2>Get In Touch</h2>
+        <p>Want to collaborate, have a role in mind, or just want to say hi? Here's where to find me:</p>
+        <div class="contact-links">
+          <a class="contact-pill" href="mailto:coopergardyne2@gmail.com">Email</a>
+          <a class="contact-pill" href="tel:0212050405">Phone</a>
+          <a class="contact-pill" href="https://www.linkedin.com/in/cooper-gardyne-59583940a/" target="_blank" rel="noopener">LinkedIn</a>
+          <a class="contact-pill" href="https://github.com/light304" target="_blank" rel="noopener">GitHub</a>
+        </div>
       </div>
       </section>
   </main>
